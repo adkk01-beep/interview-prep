@@ -210,10 +210,12 @@ function openUnivModal(idx) {
     
     const evalList = el('univModalEval');
     evalList.innerHTML = '';
-    if(s.eval && s.eval.length > 0) {
-        s.eval.forEach(e => {
-            evalList.innerHTML += `<li>${marked.parseInline(e)}</li>`;
-        });
+    if(s.eval) {
+        if(Array.isArray(s.eval)) {
+            s.eval.forEach(e => { evalList.innerHTML += `<li>${marked.parseInline(e)}</li>`; });
+        } else {
+            evalList.innerHTML = `<li>${marked.parseInline(s.eval)}</li>`;
+        }
     } else {
         evalList.innerHTML = `<li>등록된 평가요소 정보가 없습니다.</li>`;
     }
@@ -396,8 +398,7 @@ function getAIFeedback() {
         el('feedbackBtn').disabled = false;
 
         if(data.error) {
-            const errMsg = typeof data.error === 'object' ? data.error.message : data.error;
-            alert("API 호출 오류: " + errMsg);
+            alert("API 호출 오류: " + data.error.message);
             return;
         }
 

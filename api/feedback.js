@@ -23,7 +23,7 @@ export default async function handler(req) {
 
     const randomKey = keys[Math.floor(Math.random() * keys.length)];
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${randomKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${randomKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -33,7 +33,7 @@ export default async function handler(req) {
     });
 
     const data = await response.json();
-    
+
     if (!response.ok) {
        const errMsg = data.error?.message || 'Gemini API 호출 중 오류가 발생했습니다.';
        return new Response(JSON.stringify({ error: { message: errMsg } }), { status: 500, headers: { 'Content-Type': 'application/json' } });

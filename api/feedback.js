@@ -16,17 +16,17 @@ export default async function handler(req) {
       process.env.GEMINI_API_KEY_2,
       process.env.GEMINI_API_KEY_3,
       process.env.GEMINI_API_KEY_4
-    ].filter(key => key !== undefined && key.trim() !== ''); // 설정된 키만 남김
+    ].filter(key => key !== undefined && key.trim() !== '');
 
     if (keys.length === 0) {
-        return new Response(JSON.stringify({ error: '서버에 API 키가 설정되지 않았습니다. Vercel 환경변수를 확인하세요.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: '서버에 API 키가 설정되지 않았습니다. Vercel 환경변수(Environment Variables) 설정을 확인해주세요.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 
-    // 4개의 키 중 무작위로 1개를 선택하여 로드 밸런싱 (트래픽 분산)
+    // 무작위 로드 밸런싱
     const randomKey = keys[Math.floor(Math.random() * keys.length)];
 
-    // Gemini API 호출 (최신 3.8-flash 모델)
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${randomKey}`, {
+    // 올바른 최신 모델명으로 복구 (gemini-1.5-flash)
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${randomKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

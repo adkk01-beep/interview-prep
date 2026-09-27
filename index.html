@@ -396,7 +396,8 @@ function getAIFeedback() {
         el('feedbackBtn').disabled = false;
 
         if(data.error) {
-            alert("API 호출 오류: " + data.error.message);
+            const errMsg = typeof data.error === 'object' ? data.error.message : data.error;
+            alert("API 호출 오류: " + errMsg);
             return;
         }
 

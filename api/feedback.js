@@ -18,7 +18,7 @@ export default async function handler(req) {
     ].filter(key => key !== undefined && key.trim() !== '');
 
     if (keys.length === 0) {
-        return new Response(JSON.stringify({ error: { message: '서버에 API 키가 설정되지 않았습니다.' } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: { message: '서버에 API 키가 설정되지 않았습니다. Vercel 환경변수를 확인해주세요.' } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 
     const randomKey = keys[Math.floor(Math.random() * keys.length)];
@@ -35,7 +35,7 @@ export default async function handler(req) {
     const data = await response.json();
     
     if (!response.ok) {
-       const errMsg = data.error?.message || 'Gemini API 오류';
+       const errMsg = data.error?.message || 'Gemini API 호출 중 오류가 발생했습니다.';
        return new Response(JSON.stringify({ error: { message: errMsg } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 

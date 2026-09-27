@@ -18,12 +18,13 @@ export default async function handler(req) {
     ].filter(key => key !== undefined && key.trim() !== '');
 
     if (keys.length === 0) {
-        return new Response(JSON.stringify({ error: { message: '서버에 API 키가 설정되지 않았습니다. Vercel 환경변수(Environment Variables) 설정을 확인해주세요.' } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: { message: '서버에 API 키가 설정되지 않았습니다. Vercel 환경변수를 확인해주세요.' } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 
     const randomKey = keys[Math.floor(Math.random() * keys.length)];
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${randomKey}`, {
+    // 선생님께서 원래 설정해두셨던 완벽한 최신 모델(gemini-3.8-flash)로 원상복구!!
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${randomKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

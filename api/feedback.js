@@ -25,8 +25,8 @@ export default async function handler(req) {
     // 무작위 로드 밸런싱
     const randomKey = keys[Math.floor(Math.random() * keys.length)];
 
-    // 올바른 최신 모델명으로 복구 (gemini-1.5-flash)
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${randomKey}`, {
+    // 올바른 최신 모델명으로 복구 (gemini-1.5-flash-latest)
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${randomKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -27,8 +27,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 어느 키를 사용했는지 번호만 기록
-    // 실제 API 키 값은 절대 로그에 남기지 않음
+    // API 키 중 하나를 무작위 선택
     const keyIndex = Math.floor(Math.random() * keys.length);
     const randomKey = keys[keyIndex];
 
@@ -45,12 +44,7 @@ export default async function handler(req, res) {
             }
           ]
         }
-      ],
-      generationConfig: {
-        thinkingConfig: {
-          thinkingLevel: "low"
-        }
-      }
+      ]
     };
 
     async function callGemini(model) {
@@ -82,7 +76,6 @@ export default async function handler(req, res) {
       console.log(`[${model}] HTTP 상태:`, response.status);
       console.log(`[${model}] 응답 시간:`, elapsed, "ms");
 
-      // 오류일 때만 Google이 보낸 오류 내용을 기록
       if (!response.ok) {
         console.log(
           `[${model}] 오류 내용:`,
@@ -98,7 +91,10 @@ export default async function handler(req, res) {
       };
     }
 
-    // ① Gemini 3.8 Flash
+    // =====================================
+    // 1차: Gemini 3.8 Flash
+    // =====================================
+
     let result = await callGemini("gemini-3.8-flash");
 
     if (result.ok) {
@@ -108,6 +104,7 @@ export default async function handler(req, res) {
       return res.status(200).json(result.data);
     }
 
+    // 사용량 제한은 다른 모델로 재시도하지 않음
     if (result.status === 429) {
       console.log("Gemini 3.8 Flash → 429");
       console.log("===== AI FEEDBACK END =====");
@@ -118,23 +115,29 @@ export default async function handler(req, res) {
       });
     }
 
-    // ② 3.8이 503일 때만 3.7로 재시도
+    // =====================================
+    // 3.8이 서버 혼잡(503)이면
+    // 3.5 Flash Lite로 한 번 대체
+    // =====================================
+
     if (result.status === 503) {
       console.log(
-        "Gemini 3.8 Flash → 503. Gemini 3.7 Flash로 재시도합니다."
+        "Gemini 3.8 Flash → 503. Gemini 3.5 Flash Lite로 재시도합니다."
       );
 
-      result = await callGemini("gemini-3.7-flash");
+      result = await callGemini("gemini-3.5-flash-lite");
 
+      // Flash Lite 성공
       if (result.ok) {
-        console.log("Gemini 3.7 Flash 성공");
+        console.log("Gemini 3.5 Flash Lite 성공");
         console.log("===== AI FEEDBACK END =====");
 
         return res.status(200).json(result.data);
       }
 
+      // Flash Lite도 사용량 제한
       if (result.status === 429) {
-        console.log("Gemini 3.7 Flash → 429");
+        console.log("Gemini 3.5 Flash Lite → 429");
         console.log("===== AI FEEDBACK END =====");
 
         return res.status(429).json({
@@ -143,22 +146,25 @@ export default async function handler(req, res) {
         });
       }
 
+      // Flash Lite도 서버 혼잡
       if (result.status === 503) {
-        console.log("Gemini 3.7 Flash → 503");
+        console.log("Gemini 3.5 Flash Lite → 503");
         console.log("===== AI FEEDBACK END =====");
 
         return res.status(503).json({
           error:
-            "현재 구글 AI 서버 사용량이 많아 피드백을 생성하지 못했습니다(503). 잠시 후 다시 시도해주세요."
+            "현재 구글 AI 서버가 혼잡하여 피드백을 생성하지 못했습니다(503). 잠시 후 다시 시도해주세요."
         });
       }
     }
 
+    // 그 밖의 API 오류
     const apiMessage =
       result.data?.error?.message ||
       `Gemini API 오류가 발생했습니다 (${result.status}).`;
 
     console.log("기타 Gemini API 오류:", result.status);
+    console.log("오류 내용:", JSON.stringify(result.data));
     console.log("===== AI FEEDBACK END =====");
 
     return res.status(result.status || 500).json({

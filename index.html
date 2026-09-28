@@ -396,7 +396,7 @@ function getAIFeedback() {
 ### 6. 추천 답변 흐름 (선택)`;
 
     fetch('/api/feedback', {
-        method: 'POST',
+        method: 'POST',   
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt })
     })

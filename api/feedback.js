@@ -22,27 +22,43 @@ export default async function handler(req) {
     }
 
     const randomKey = keys[Math.floor(Math.random() * keys.length)];
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${randomKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${randomKey}`;
+    const payload = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.3 }
-      })
-    });
+    };
 
-    const data = await response.json();
+    // 지수 백오프 기반 자동 재시도 로직
+    let attempt = 0;
+    const maxRetries = 3;
+    let delay = 1000; // 초기 대기 시간 1초
 
-    if (!response.ok) {
-       const errMsg = data.error?.message || 'Gemini API 호출 중 오류가 발생했습니다.';
-       return new Response(JSON.stringify({ error: { message: errMsg } }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    while (attempt <= maxRetries) {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        // 1. 성공 시 바로 데이터 반환
+        if (response.ok) {
+            return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        } 
+        // 2. High Demand (503) 또는 Too Many Requests (429) 에러 시 재시도
+        else if ((response.status === 503 || response.status === 429) && attempt < maxRetries) {
+            attempt++;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2; // 다음 대기 시간 2배로 증가 (1초 -> 2초 -> 4초)
+            continue;
+        } 
+        // 3. 재시도 한도를 초과하거나 다른 종류의 에러일 경우 실패 반환
+        else {
+            const errMsg = data.error?.message || 'Gemini API 호출 중 오류가 발생했습니다.';
+            return new Response(JSON.stringify({ error: { message: errMsg } }), { status: response.status, headers: { 'Content-Type': 'application/json' } });
+        }
     }
-
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
 
   } catch (error) {
     return new Response(JSON.stringify({ error: { message: error.message } }), { status: 500, headers: { 'Content-Type': 'application/json' } });

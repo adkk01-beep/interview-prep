@@ -19,21 +19,12 @@ export default async function handler(req, res) {
       process.env.GEMINI_API_KEY_2,
       process.env.GEMINI_API_KEY_3,
       process.env.GEMINI_API_KEY_4
-    ].filter(Boolean);
+    ];
 
-    if (keys.length === 0) {
-      return res.status(500).json({
-        error: "Gemini API 키가 설정되어 있지 않습니다."
-      });
-    }
-
-    // API 키 중 하나를 무작위 선택
-    const keyIndex = Math.floor(Math.random() * keys.length);
-    const randomKey = keys[keyIndex];
-
-    console.log("===== AI FEEDBACK START =====");
-    console.log("사용 API KEY 번호:", keyIndex + 1);
+    console.log("====================================");
+    console.log("API KEY 4개 진단 시작");
     console.log("프롬프트 글자 수:", prompt.length);
+    console.log("====================================");
 
     const payload = {
       contents: [
@@ -47,137 +38,150 @@ export default async function handler(req, res) {
       ]
     };
 
-    async function callGemini(model) {
-      const startTime = Date.now();
+    async function testKey(key, keyNumber) {
+      // 환경변수가 비어 있는 경우
+      if (!key) {
+        console.log(`KEY ${keyNumber} → 환경변수 없음`);
 
-      console.log(`[${model}] 요청 시작`);
+        return {
+          keyNumber,
+          status: "NO_KEY",
+          message: "환경변수가 설정되어 있지 않음"
+        };
+      }
+
+      const model = "gemini-3.8-flash";
 
       const url =
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${randomKey}`;
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
+      const startTime = Date.now();
 
-      const elapsed = Date.now() - startTime;
-
-      let data;
+      console.log("------------------------------------");
+      console.log(`KEY ${keyNumber} → ${model} 요청 시작`);
 
       try {
-        data = await response.json();
-      } catch (e) {
-        data = null;
-      }
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
 
-      console.log(`[${model}] HTTP 상태:`, response.status);
-      console.log(`[${model}] 응답 시간:`, elapsed, "ms");
+        const elapsed = Date.now() - startTime;
 
-      if (!response.ok) {
+        let data;
+
+        try {
+          data = await response.json();
+        } catch (e) {
+          data = null;
+        }
+
         console.log(
-          `[${model}] 오류 내용:`,
-          JSON.stringify(data)
+          `KEY ${keyNumber} → HTTP 상태: ${response.status}`
         );
+
+        console.log(
+          `KEY ${keyNumber} → 응답 시간: ${elapsed} ms`
+        );
+
+        if (!response.ok) {
+          console.log(
+            `KEY ${keyNumber} → 오류 메시지:`,
+            data?.error?.message || "오류 메시지 없음"
+          );
+
+          console.log(
+            `KEY ${keyNumber} → 오류 상태:`,
+            data?.error?.status || "상태 정보 없음"
+          );
+        } else {
+          console.log(`KEY ${keyNumber} → 성공`);
+        }
+
+        return {
+          keyNumber,
+          status: response.status,
+          elapsed,
+          message:
+            data?.error?.message ||
+            (response.ok ? "SUCCESS" : "UNKNOWN ERROR")
+        };
+
+      } catch (error) {
+        const elapsed = Date.now() - startTime;
+
+        console.log(
+          `KEY ${keyNumber} → 호출 자체에서 오류 발생`
+        );
+
+        console.log(
+          `KEY ${keyNumber} →`,
+          error?.message || String(error)
+        );
+
+        return {
+          keyNumber,
+          status: "FETCH_ERROR",
+          elapsed,
+          message: error?.message || String(error)
+        };
       }
-
-      return {
-        status: response.status,
-        ok: response.ok,
-        data,
-        elapsed
-      };
     }
 
-    // =====================================
-    // 1차: Gemini 3.8 Flash
-    // =====================================
+    // ==========================================
+    // API KEY 1~4를 각각 한 번씩 검사
+    // ==========================================
 
-    let result = await callGemini("gemini-3.8-flash");
+    const results = [];
 
-    if (result.ok) {
-      console.log("Gemini 3.8 Flash 성공");
-      console.log("===== AI FEEDBACK END =====");
-
-      return res.status(200).json(result.data);
+    for (let i = 0; i < keys.length; i++) {
+      const result = await testKey(keys[i], i + 1);
+      results.push(result);
     }
 
-    // 사용량 제한은 다른 모델로 재시도하지 않음
-    if (result.status === 429) {
-      console.log("Gemini 3.8 Flash → 429");
-      console.log("===== AI FEEDBACK END =====");
+    console.log("====================================");
+    console.log("API KEY 진단 결과 요약");
 
-      return res.status(429).json({
-        error:
-          "현재 Gemini API 사용량 제한에 도달했습니다(429). 잠시 후 다시 시도해주세요."
-      });
-    }
-
-    // =====================================
-    // 3.8이 서버 혼잡(503)이면
-    // 3.5 Flash Lite로 한 번 대체
-    // =====================================
-
-    if (result.status === 503) {
+    for (const result of results) {
       console.log(
-        "Gemini 3.8 Flash → 503. Gemini 3.5 Flash Lite로 재시도합니다."
+        `KEY ${result.keyNumber} → ${result.status} / ${result.elapsed ?? "-"} ms`
       );
-
-      result = await callGemini("gemini-3.5-flash-lite");
-
-      // Flash Lite 성공
-      if (result.ok) {
-        console.log("Gemini 3.5 Flash Lite 성공");
-        console.log("===== AI FEEDBACK END =====");
-
-        return res.status(200).json(result.data);
-      }
-
-      // Flash Lite도 사용량 제한
-      if (result.status === 429) {
-        console.log("Gemini 3.5 Flash Lite → 429");
-        console.log("===== AI FEEDBACK END =====");
-
-        return res.status(429).json({
-          error:
-            "현재 Gemini API 사용량 제한에 도달했습니다(429). 잠시 후 다시 시도해주세요."
-        });
-      }
-
-      // Flash Lite도 서버 혼잡
-      if (result.status === 503) {
-        console.log("Gemini 3.5 Flash Lite → 503");
-        console.log("===== AI FEEDBACK END =====");
-
-        return res.status(503).json({
-          error:
-            "현재 구글 AI 서버가 혼잡하여 피드백을 생성하지 못했습니다(503). 잠시 후 다시 시도해주세요."
-        });
-      }
     }
 
-    // 그 밖의 API 오류
-    const apiMessage =
-      result.data?.error?.message ||
-      `Gemini API 오류가 발생했습니다 (${result.status}).`;
+    console.log("====================================");
+    console.log("API KEY 진단 종료");
+    console.log("====================================");
 
-    console.log("기타 Gemini API 오류:", result.status);
-    console.log("오류 내용:", JSON.stringify(result.data));
-    console.log("===== AI FEEDBACK END =====");
+    // 진단 결과를 브라우저에도 표시
+    const summary = results
+      .map((r) => {
+        return (
+          `KEY ${r.keyNumber}: ` +
+          `${r.status}` +
+          (r.elapsed !== undefined
+            ? ` (${r.elapsed}ms)`
+            : "")
+        );
+      })
+      .join("\n");
 
-    return res.status(result.status || 500).json({
-      error: apiMessage
+    return res.status(503).json({
+      error:
+        "API 키 진단이 완료되었습니다.\n\n" +
+        summary +
+        "\n\nVercel Logs에서 상세 결과를 확인해주세요."
     });
 
   } catch (error) {
-    console.error("===== FEEDBACK FUNCTION ERROR =====");
+    console.error("===== 진단 코드 자체 오류 =====");
     console.error(error);
 
     return res.status(500).json({
       error:
-        "피드백 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        "API 키 진단 중 오류가 발생했습니다."
     });
   }
 }
